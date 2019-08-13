@@ -18,12 +18,15 @@ export class Node implements d3.SimulationNodeDatum {
     linkCount: number = 0;
     selectionId: ISelectionId;
     isBranch: boolean;
+    func: string;
+    scale: number;
 
-      constructor(name, lvl, selectionId, branch) {
+      constructor(name, lvl, selectionId, branch, func) {
       this.name = name;
       this.lvl = lvl;
       this.selectionId = selectionId;
       this.isBranch = branch == name;
+      this.func = func;
       var rnd = Math.random() * 60 - 30;
 
       var fixedvertical = 0;
@@ -86,7 +89,20 @@ export class Node implements d3.SimulationNodeDatum {
     }
   
     public r(scale) {
-return 50 *  1 / Math.log(scale);
+      if (scale > -1) {
+      this.scale = scale;
+      }
+
+      var branchScale = 1;
+
+      if (this.isBranch) {
+        var factor : number;
+        if ( Math.log(this.scale) > 30 ) { factor = 30 } else { factor =  Math.log(this.scale) };
+         branchScale = (factor / 30.0 ) * 2 + 1;
+      }
+return 30 * branchScale;
+
+ 
     }
   
     get fontSize() {

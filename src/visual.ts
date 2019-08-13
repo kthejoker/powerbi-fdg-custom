@@ -48,6 +48,8 @@ export interface Relationship {
     Target: string;
     Level: string;
     TLevel: string;
+    SFunction: string;
+    TFunction: string;
     Kop: string;
     selectionId: ISelectionId;
     isBranch: string;
@@ -55,7 +57,7 @@ export interface Relationship {
 
 import { VisualSettings } from "./settings";
 import * as d3 from "d3";
-import Selection = d3.Selection;
+//import Selection = d3.Selection;
 import { Node } from './node';
 import { Link } from './link';
 import { hostname } from "os";
@@ -66,8 +68,8 @@ export class Visual implements IVisual {
     private settings: VisualSettings;
     private textNode: Text;
     private host: IVisualHost;
-    private svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, any>;
-    private g: d3.Selection<SVGElement, unknown, HTMLElement, any>;
+    private svg: d3.Selection<SVGSVGElement, any, HTMLElement, any>;
+    private g: d3.Selection<SVGElement, any, HTMLElement, any>;
     private margin = { top: 20, right: 20, bottom: 20, left: 20 };
     private dataView: DataView;
 
@@ -75,9 +77,13 @@ export class Visual implements IVisual {
     private selectionManager: ISelectionManager;
     private selectionIdBuilder: ISelectionIdBuilder;
 
-    private root: Selection<any, any, any, any>;
+    private getUniqueValues(value, index, self) {
+        return self.indexOf(value) === index;
+    }
 
-    private static ClassName: string = "slbrelationship";
+   // private root: Selection<any, any, any, any>;
+
+    private static ClassName: string = "slbrelationship"; 
 
     constructor(options: VisualConstructorOptions) {
         console.log('Visual constructor', options);
@@ -90,7 +96,11 @@ export class Visual implements IVisual {
         this.svg = d3.select(options.element)
             .append('svg')
             .attr("width", "100%").attr("height", '100%')
+            //.attr("viewBox", [0, 0, 800, 800])
             .classed(Visual.ClassName, true);
+console.log('running');
+
+     
 
         this.g = this.svg.append("g")
             .classed('gClass', true);
@@ -98,7 +108,21 @@ export class Visual implements IVisual {
            //     this.svg.attr("transform", "translate(" + d3.event.translate + ")" + " scale(" + d3.event.scale + ")")
            //   }));
 
-      
+           this.svg.call(d3.zoom()
+           .extent([[0, 0], [600, 600]])
+           .scaleExtent([.5, 8])
+           .on("zoom", zoomed));
+
+   let g =this.g;
+   
+           function zoomed() {
+            const {transform} = d3.event;
+            console.log('zooming ...');
+            console.log('transform',  d3.event.transform);
+            //g.attr("transform", d => `translate(${transform.apply(d)})`);
+            g.attr("transform", d3.event.transform);
+          }
+
     }
 
     public update(options: VisualUpdateOptions) {
@@ -119,9 +143,9 @@ export class Visual implements IVisual {
       //  links2 = links2.filter(item => item.target != "null") ;
         console.log('links2', links2);
 
-        var sources3 = links.map(x => new Node( x.Source, x.Level, x.selectionId, x.isBranch) );
+        var sources3 = links.map(x => new Node( x.Source, x.Level, x.selectionId, x.isBranch, x.SFunction) );
        // var nodesm3 = sources3;
-        var targets3 = links.map(x =>  new Node( x.Target, x.TLevel, x.selectionId, x.isBranch));
+        var targets3 = links.map(x =>  new Node( x.Target, x.TLevel, x.selectionId, x.isBranch, x.TFunction));
        var nodesm3 = sources3.concat(targets3.filter(function (item) {
             return !sources3.some(function (f) {
                 return f.name === item.name && f.lvl === item.lvl;
@@ -142,7 +166,7 @@ var nodesm = nodesm5;
        // var nodesm = nodesm4.map(x => new Node(x["Source"], x["Level"]));
         //console.log('nodesm', nodesm);
 
-
+/*
         function getSvgPath(link: Link): string {
             let x0: number,
                 x1: number,
@@ -167,7 +191,7 @@ var nodesm = nodesm5;
             y1 = link.target.y; //+ link.dyDestination //+ link.height / SankeyDiagram.MiddleFactor;
 
             return `M ${x0} ${y0} C ${x2} ${y0}, ${x3} ${y1}, ${x1} ${y1}`;
-        }
+        } */
 
         // console.log('nodes b',nodesb);
         var g = this.g;
@@ -179,14 +203,25 @@ var nodesm = nodesm5;
                 .id(d => d['name'])
             )
             .force("center", d3.forceCenter(parseInt(svg.style("width")) / 2, parseInt(svg.style("height")) / 2))
-            .force('charge', d3.forceManyBody().strength(() => {return -30000 / nodesm.length ;})
+            .force('charge', d3.forceManyBody().strength(() => {return -20000 / Math.log(nodesm.length) ;})
             .distanceMin(2).distanceMax(270))
             //.force("y",function(d){ if(d["name"].indexOf("M1") > -1){ return 30; }else{return 100;} })
             .stop();
             ;
 
-        const link = svg.append("g")
+        const link = g
             //.attr("stroke", "#999")
+            .attr("stroke-opacity", 0.5)
+            .selectAll("line")
+            .data(links2)
+            .join("line")
+            .attr("stroke-width", 2.5)
+            .attr('stroke', function(d) { return d.color; });
+            ;
+
+            link.append("title").text( function(d) { return d.kop;});
+
+           /* const linkpath = svg.append("g")
             .attr("stroke-opacity", 1)
             .selectAll("line")
             .data(links2)
@@ -194,32 +229,83 @@ var nodesm = nodesm5;
             .attr("stroke-width", 3)
             .attr('stroke', function(d) { return d.color; });
             ;
+*/
 
-            link.append("title").text( function(d) { return d.kop;});
 
-            const linkpath = svg.append("g")
-            .attr("stroke-opacity", 1)
-            .selectAll("line")
-            .data(links2)
-            .join("line")
-            .attr("stroke-width", 3)
-            .attr('stroke', function(d) { return d.color; });
-            ;
 
-            link.append("title").text( function(d) { return d.kop;});
+
+const kopList = Array.from(new Set(links2)).map(k => k.kop);
+        console.log('KOP List', kopList);
+
+       //Get unique values
+        var KOPLegend = kopList.filter(this.getUniqueValues);
+        console.log('KOPLegend', KOPLegend);
+
+        //Color List
+        var kopColors = {
+            "Logistics Management": "red",
+            "Investment and Project Management": "blue",
+            "Procure to Pay": "orange",
+            "Financial Accounting to Reporting": "green",
+            "Inventory Management and Distribution": "yellow",
+            "Supply Planning": "cyan",
+            "M&S Management and Distribution": "black",
+            "Warehouse Management": "blue",
+            "Source to Contract": "red",
+            "Sales Planning": "brown",
+            "Workforce Development and Engagement": "tan",
+            "Workforce Planning and Productivity": "darkblue",
+            "Asset Maintenance and Sustaining": "lightblue",
+            "Asset Management": "darkgreen",
+            "Operational Financial Planning": "lightgreen",
+            "Product and Service Delivery": "#9cc",
+            "Integrity Management": "#999",
+            "Integration Project Management": "#66f"
+        };
+
+        // Add legend step 1 : adding legend variable
+        var funcColors = {
+            "FIN": "red",
+            "IM": "blue",
+            "SUP": "orange",
+            "OPRM": "green",
+            "SP": "yellow",
+            "PSD": "cyan",
+            "TLM": "black",
+            "REM": "blue",
+            "FDE": "red",
+            "HR": "brown"};
+
+            var businessWorkflows = {
+                "FDE": "#8dbe50",
+                "FIN": "#ffc426",
+                "HR": "#ffc426",
+                "IM": "#d9d9d9",
+                "IT": "#038d7f",
+                "OPRM": "#8177b7",
+                "PSD": "#f68720",
+                "REM": "#038d7f",
+                "SP": "#039fc2",
+                "SUP": "#ffc426",
+                "TLM": "#038d7f",
+                "null": "#999"
+            };
+    
+
+
+
+            link.append("title").text( function(d) { return d.kop;}); 
 
             let selectionManager = this.selectionManager;
-        const node  = svg.append("g")
-            
-         
+        const node  = g         
             .selectAll("circle")
             .data(nodesm)
 
             .join("circle")
-            .attr("stroke", d => d.isBranch ? "#000" : "#fff")
-            .attr("stroke-width", 1.5)
+            .attr("stroke", d => d.isBranch ? "#9ff5d6" : "#fff")
+            .attr("stroke-width", d => d.isBranch ? 3 : 1.5)
             .attr("r", d => d.r(nodesm.length))
-            .attr("fill", "#9ff5d6")
+            .attr("fill", d => d.isBranch ? "#fff" : businessWorkflows[d.func] )
             .on('click', function(d) {
                 
                console.log('click!');
@@ -238,25 +324,43 @@ var nodesm = nodesm5;
 
         //Add tooltips in circles
         node.append("title")
-            .text(d => d.name);
+            .text(d => d.name + " " + d.func);
         console.log('node', node);
 
         //Add text box in circles
-        var textg = svg.append("g");
+        var textg = g.append("g");
+        var textg2 = g.append("g");
         
         var text = textg.selectAll("text")
             .data(force.nodes())
             .enter().append("text")
-            .attr("font-size", function(d) { if ( force.nodes.length > 50 ) {return "10px"}; 
-            if (force.nodes.length > 20 ) { return "12px"}
-            if (force.nodes.length > 7 ) { return "14px"}
-            return "16px";
+            .attr("font-size", function(d) { if ( force.nodes.length > 50 ) {return "8px"}; 
+            if (force.nodes.length > 20 ) { return "10px"}
+            if (force.nodes.length > 7 ) { return "12px"}
+            return "14px";
         })
-            .attr("dx", "20") //distance between the circle and the text
-            .attr("y", ".26em") //".31em"
-            .attr("dy", ".26em")
+            .attr("dx", 0 ) // d => d.r(-1) *-1 ) //distance between the circle and the text
+            .attr("y", 0) //".31em"
+            .attr("dy", d => d.r(-1) + 10)
+                     
            // .attr("dy", d => d.y)
             .text(function (d) { return d.name; });
+
+
+            var text2 = textg2.selectAll("text")
+            .data(force.nodes())
+            .enter().append("text")
+            .attr("font-size", function(d) { if ( force.nodes.length > 50 ) {return "8px"}; 
+            if (force.nodes.length > 20 ) { return "10px"}
+            if (force.nodes.length > 7 ) { return "12px"}
+            return "14px";
+        })
+            .attr("dx",-7 ) // d => d.r(-1) *-1 ) //distance between the circle and the text
+            .attr("y", 0) //".31em"
+            .attr("dy", 4)
+                     
+           // .attr("dy", d => d.y)
+            .text(function (d) { return "12"; });
 
             textg.selectAll("text").call(wrap, 200);
 
@@ -321,24 +425,83 @@ var nodesm = nodesm5;
 
             text
                 .attr("transform", transform) //This is to add the labels in the circles
+                text2
+                .attr("transform", transform)
                 //.call(wrap, 85);
 
                
+               // g.attr("transform","scale(0.2)")
 
+console.log('bbox',(g.node() as SVGSVGElement).getBBox());
         //});
 
-        function wrap(text, width) {
+        var legend = svg.append("g")
+           
+            //.attr("x", w - 65)
+            //.attr("y", 50)
+            .attr("height", 100)
+            .attr("width", 100)
+            .classed("legend", true)
+            .attr('transform', 'translate(5,5)'); //Position of legend
+
+            var legendrect = legend.append("rect").attr("height", 100)
+            .attr("width", 100).attr("fill", "white").attr("stroke", "#333").attr("stroke-width", .2);
+
+            var legendrectg = svg.append("g").attr("class", "legend").attr("height", 100)
+            .attr("width", 100).attr('transform', 'translate(10, 10)');
+
+            
+        // Add legend step 2: adding icon identifier
+        legendrectg.selectAll('rect')
+        
+            .data(KOPLegend)
+            .enter()
+            .append("rect")
+            .attr("x", 0) //w - 65
+            .attr("y", function (d, i) { return i * 14; })
+            .attr("width", 20)
+            .attr("height", 5)
+            .style("fill", function (d) {
+                var color = kopColors[KOPLegend[(KOPLegend.indexOf(d))].toString()];
+                return color;
+            })
+            ;
+        // Add legend step 3: adding text label
+        legendrectg.selectAll('text')
+            .data(KOPLegend)
+            .enter()
+            .append("text")
+            //.append("text").text(function (d) { return d.kop; })
+            .attr("x", 25) //w - 52
+            .attr("font-size", "10px")
+            .attr("y", function (d, i) { return i * 14 + 7; })
+            .text(function (d) {
+                var text = KOPLegend[(KOPLegend.indexOf(d))];
+                return text;
+            });
+
+            legendrect.attr("width", legendrectg.node().getBBox().width + 10);
+            legendrect.attr("height", legendrectg.node().getBBox().height + 10);
+            //legendrect.attr("dx", legendrectg.node().getBBox().left -5);
+            //legendrect.attr("dy", legendrectg.node().getBBox().top -5);
+
+        //END KOP Legend
+
+
+        function wrap(text, width2) {
             text.each(function() {
+                var width = (parseFloat(d3.select(this).attr("dy")) - 10 )*2.5;
+            
               var text = d3.select(this),
                   words = text.text().split(/\s+/).reverse(),
                   word,
                   line = [],
                   lineNumber = 0,
-                  lineHeight = 1, // ems
+                  lineHeight = parseInt(text.attr("font-size")), // ems
                   dx = text.attr("dx"),
-                  y = text.attr("y"),
+                  y = "0px", // text.attr("y"),
                   dy = parseFloat(text.attr("dy")), //; //,
-                  tspan = text.text(null).append("tspan").attr("x",0).attr("dx", dx).attr("y", y).attr("dy", dy + "em");
+                  tspan = text.text(null).append("tspan").attr("text-anchor","middle").attr("x",0).attr("dx", dx).attr("y", y).attr("dy", dy + "px");
                  
               while (word = words.pop()) {
                 line.push(word);
@@ -347,7 +510,7 @@ var nodesm = nodesm5;
                   line.pop();
                   tspan.text(line.join(" "));
                   line = [word];
-                  tspan = text.append("tspan").attr("dx", dx).attr("x",0).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
+                  tspan = text.append("tspan").attr("dx", dx).attr("text-anchor","middle").attr("x",0).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "px").text(word);
                 }
               }
              
@@ -363,12 +526,14 @@ var nodesm = nodesm5;
     }
 
     private reset(): void {
-        if (this.svg.empty()) {
+        if (this.g.empty()) {
             return;
         }
-        this.svg
+        this.g
             .selectAll("*")
             .remove();
+
+            this.svg.selectAll(".legend").remove();
     }
 
     private static parseSettings(dataView: DataView): VisualSettings {
@@ -390,6 +555,8 @@ console.log('converting');
             || !options.dataViews[0].categorical.categories[3].source
             || !options.dataViews[0].categorical.categories[4].source
             || !options.dataViews[0].categorical.categories[5].source
+            || !options.dataViews[0].categorical.categories[6].source
+            || !options.dataViews[0].categorical.categories[7].source
         )
             return resultData;
 
@@ -399,6 +566,9 @@ console.log('converting');
         let tlevels = options.dataViews[0].categorical.categories[3].values;
         let kops = options.dataViews[0].categorical.categories[4].values;
         let branches = options.dataViews[0].categorical.categories[5].values;
+        let sfuncs = options.dataViews[0].categorical.categories[6].values;
+        let tfuncs = options.dataViews[0].categorical.categories[7].values;
+
         //debugger;
 
         for (let i = 0; i < rows.length; i++) {
@@ -416,6 +586,8 @@ console.log('converting');
                 TLevel: String(tlevels[i]),
                 Kop: String(kops[i]),
                 isBranch: String(branches[i]),
+                SFunction: String(sfuncs[i]),
+                TFunction : String(tfuncs[i]),
                 selectionId:  host.createSelectionIdBuilder()
                 .withCategory(options.dataViews[0].categorical.categories[0], i)
                 .createSelectionId()
