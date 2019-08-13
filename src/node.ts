@@ -1,4 +1,7 @@
 import * as d3 from "d3";
+import powerbi from "powerbi-visuals-api";
+import ISelectionId = powerbi.extensibility.ISelectionId;
+import { selection } from "d3";
 
 export class Node implements d3.SimulationNodeDatum {
     // optional - defining optional implementation properties - required for relevant typing assistance
@@ -13,11 +16,20 @@ export class Node implements d3.SimulationNodeDatum {
     name: string;
     lvl: string;
     linkCount: number = 0;
+    selectionId: ISelectionId;
+    isBranch: boolean;
 
-      constructor(name, lvl) {
+      constructor(name, lvl, selectionId, branch) {
       this.name = name;
       this.lvl = lvl;
+      this.selectionId = selectionId;
+      this.isBranch = branch == name;
       var rnd = Math.random() * 60 - 30;
+
+      var fixedvertical = 0;
+
+      if (fixedvertical) {
+
       if (this.lvl == "M1") {
         this.fy = 30;
       }
@@ -37,6 +49,8 @@ export class Node implements d3.SimulationNodeDatum {
       if (this.lvl == "M5") {
         this.fy = 510 + rnd;
       }
+
+    }
     }
   
    // constructor(name, lvl) {
@@ -71,8 +85,8 @@ export class Node implements d3.SimulationNodeDatum {
     return 2;
     }
   
-    get r() {
-      return 50 * this.normal() + 10;
+    public r(scale) {
+return 50 *  1 / Math.log(scale);
     }
   
     get fontSize() {

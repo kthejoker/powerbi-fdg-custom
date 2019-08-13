@@ -6,8 +6,8 @@ export class Link implements d3.SimulationLinkDatum<Node> {
   index?: number;
 
   // must - defining enforced implementation properties
-  source: Node | string | number;
-  target: Node | string | number;
+  source: Node;
+  target: Node;
   kop: string;
 
 
@@ -40,9 +40,9 @@ var kopColors = {
 "Asset Maintenance and Sustaining" : "lightblue",
 "Asset Management" : "darkgreen",
 "Operational Financial Planning" : "lightgreen",
-"Product and Service Delivery" : "grey",
-"Integrity Management" : "lightgrey",
-"Integration Project Management" : "silver"
+"Product and Service Delivery" : "#9cc",
+"Integrity Management" : "#999",
+"Integration Project Management" : "#66f"
 
 };
 
