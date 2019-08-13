@@ -26,6 +26,9 @@
 export interface Relationship {
     Source: string;
     Target: string;
+    Level: string;
+    TLevel: string;
+    Kop: string;
 }
 
 //"use strict";
@@ -45,7 +48,7 @@ import { VisualSettings } from "./settings";
 import * as d3 from "d3";
 import { Node } from './node';
 import { Link } from './link';
-import { dataViewObjectsParser } from "powerbi-visuals-utils-dataviewutils";
+//import { dataViewObjectsParser } from "powerbi-visuals-utils-dataviewutils";
 export class Visual implements IVisual {
     private target: HTMLElement;
     private updateCount: number;
@@ -55,7 +58,6 @@ export class Visual implements IVisual {
     private g: d3.Selection<SVGElement, unknown, HTMLElement, any>;
     private margin = { top: 20, right: 20, bottom: 200, left: 70 };
     private dataView: DataView;
-    private testNoGroup: any;
 
     constructor(options: VisualConstructorOptions) {
         console.log('Visual constructor', options);
@@ -111,17 +113,16 @@ export class Visual implements IVisual {
         this.svg = d3.select(options.element)
             .append('svg')
             .attr("width", "100%").attr("height", '100%')
-                        .classed('circleClass', true);
+            .classed('svgClass', true);
 
-        this.g = this.svg.append("g");
+        this.g = this.svg.append("g")
+            .classed('gClass', true);
 
         /*
         #1 force simulated 
         */
         var width = 900,
             height = 800;
-
-
 
 
         /*
@@ -182,59 +183,69 @@ export class Visual implements IVisual {
             this.textNode.textContent = (this.updateCount++).toString();
         }
 
+        //Clean the current visualization
+        this.reset();
+
         //This example just shows: Custom Prop is Object
         //this.target.innerHTML = "Custom Prop is " + this.target;
 
         //set dataview
         this.dataView = options.dataViews[0];
 
-        //test adding a circle
-
-        // add the nodes
-        //this.g.append("circle")
-        //    .attr("r", 150);
-        //.attr("fill","red");
-
-
         let links = Visual.converter(options);
 
-       // var nodesa = [ {"name": "Chile"}, {"name": "khale@infusion.com"} ];
+        // var nodesa = [ {"name": "Chile"}, {"name": "khale@infusion.com"} ];
         //var nodesb = nodesa.map(x => new Node(x.name));
 
-       var links2 = links.map(x => new Link(x.Source, x.Target));
+        var links2 = links.map(x => new Link(x.Source, x.Target, x.Kop));
+        links2 = links2.filter(item => item.target["name"] != "null") ;
+        links2 = links2.filter(item => item.target != "null") ;
         console.log('links2', links2);
 
-        var sources3 = links.map(x => x.Source);
-        var targets3 = links.map(x => x.Target);
-        var nodesm3 = sources3.concat(targets3.filter(function (item) {
-            return sources3.indexOf(item) < 0;
+        var sources3 = links.map(x => new Node( x.Source, x.Level ) );
+       // var nodesm3 = sources3;
+        var targets3 = links.map(x =>  new Node( x.Target, x.TLevel ));
+       var nodesm3 = sources3.concat(targets3.filter(function (item) {
+            return !sources3.some(function (f) {
+                return f.name === item.name && f.lvl === item.lvl;
+            });
         }));
 
+        var nodesm5 = nodesm3.filter((n,index) => {
+            return index === nodesm3.findIndex(obj => {
+              return n.name === obj.name && n.lvl === obj.lvl;
+            });
+          });
+
+          nodesm5 = nodesm5.filter(item => item.name != "null");
+
         var nodesm4 = Array.from(new Set(nodesm3));
-
         console.log('nodesm4', nodesm4);
-        var nodesm = nodesm4.map(x => new Node(x));
-        
-       // var sources = links.map(x => new Node (x.Source));
-       // var targets = links.map(x => new Node (x.Target));
-        //var nodesm = sources.concat(targets.filter(function (item) {
-       //     return sources.indexOf(item) < 0;
-       // }));
+var nodesm = nodesm5;
+       // var nodesm = nodesm4.map(x => new Node(x["Source"], x["Level"]));
+        console.log('nodesm', nodesm);
 
-         
-          // console.log('nodes b',nodesb);
-           var g = this.g;
+        // var sources = links.map(x => new Node (x.Source));
+        // var targets = links.map(x => new Node (x.Target));
+        //var nodesm = sources.concat(targets.filter(function (item) {
+        //     return sources.indexOf(item) < 0;
+        // }));
+
+
+        // console.log('nodes b',nodesb);
+        var g = this.g;
         var svg = this.svg;
         var count = 0;
-   var force = d3.forceSimulation(nodesm)
+        var force = d3.forceSimulation(nodesm)
             .force('link', d3.forceLink(links2)
-                .distance(50)
-                .id( d => d['name'] )
-               )
-                .force("center", d3.forceCenter(parseInt(svg.style("width")) / 2, parseInt(svg.style("height")) / 2) )
-            .force('charge', d3.forceManyBody().strength(-40));
-
-         
+               // .distance(200) //Distance between circles
+                .id(d => d['name'])
+            )
+            .force("center", d3.forceCenter(parseInt(svg.style("width")) / 2, parseInt(svg.style("height")) / 2))
+            .force('charge', d3.forceManyBody().strength(-350)
+            .distanceMin(2).distanceMax(270))
+            //.force("y",function(d){ if(d["name"].indexOf("M1") > -1){ return 30; }else{return 100;} })
+            ;
 
         const link = svg.append("g")
             .attr("stroke", "#999")
@@ -243,210 +254,460 @@ export class Visual implements IVisual {
             .data(links2)
             .join("line")
             .attr("stroke-width", 3)
+            .attr('stroke', function(d) { return d.color; });
             ;
 
-            const node = svg.append("g")
+        const node = svg.append("g")
             .attr("stroke", "#fff")
             .attr("stroke-width", 1.5)
             .selectAll("circle")
             .data(nodesm)
             .join("circle")
-            .attr("r", 10)
-            .attr("fill", "red");
-            
-            node.append("title")
-            .text(d => d.name);
+            .attr("r", 12)
+            .attr("fill", "red")
+            //.attr("x",100)
+            //.attr("cy", function (d) {
+               // if (d.name.indexOf("M1") > -1) {
+                //if (1 == 0) {
+                 //   console.log('value', d3.select(this).attr("cy"), 'name', d.name);
+               //     return 200;
+                    // return Number(d3.select(this).attr("cy")) - 200;
+               // }
+               /*
+                if (d.name.indexOf("M2") > -1) {
+                    return 300;
+                }
+                if (d.name.indexOf("M3") > -1) {
+                    return 400;
+                }
+                if (d.name.indexOf("M4") > -1) {
+                    return 500;
+                }
+                if (d.name.indexOf("M5") > -1) {
+                    return 600;
+                }
+                else {    
+                    */                
+              //      return d.y;//(d3.select(this).attr("cy"));
+                //}
+           // }
+           // )
 
-
-             force.on("tick", () => {
-
-                
-    link
-        .attr("x1", function(d) { if (d.source['x']) return d.source['x']; } )
-        .attr("y1", d => d.source['y'])
-        .attr("x2", d => d.target['x'])
-        .attr("y2", d => d.target['y']);
-       // console.log('tock');
-    node
-        .attr("cx", d => d.x)
-       .attr("cy", d => d.y);
-  });
-
-
-   /* 
-        links.forEach(function (link) {
-
-            count = count + 20;
-    
-            g.append("text").text(link.Source)
-                .attr("x", 50)
-                .attr("y", count)
-                .attr("font-size", "24px")
-                .attr("fill", "black");
-            
-            // add the links and the arrows
-            var path = svg.append("svg:g").selectAll("path")
-            .data(links2)
-            .enter().append("svg:path")
-            //.attr("class", function (d) { return "link " + d.type; })
-            .attr("marker-end", "url(#end)");
-
-            // define the nodes
-            var node = svg.selectAll(".node")
-            .data(force.nodes())
-            .enter().append("g")
-            .attr("class", "node")
             ;
 
-            // add the nodes
-            node.append("circle")
-                .attr("r",25);
+        //nodesm.forEach(function(d) { d.y = d.x * 5; });
 
-            //node.append("text").text(function (d) { return d.source });
 
-           
+        //Add tooltips in circles
+        node.append("title")
+            .text(d => d.name);
+        console.log('node', node);
 
-            /*
+        //Add text box in circles
+        var textg = svg.append("g");
+        
+        var text = textg.selectAll("text")
+            .data(force.nodes())
+            .enter().append("text")
+            .attr("x", 10) //distance between the circle and the text
+            .attr("y", ".31em") //".31em"
+            .attr("dy", ".31em")
+           // .attr("dy", d => d.y)
+            .text(function (d) { return d.name; });
 
-                            .attr("class", function (d) {
-                                if (d.name.indexOf("M1") > -1) {
-                                    return "circle-m1";
-                                }
-                                else if (d.name.indexOf("M2") > -1) {
-                                    return "circle-m2";
-                                }
-                                else if (d.name.indexOf("M3") > -1) {
-                                    return "circle-m3";
-                                }
-                                else if (d.name.indexOf("M4") > -1) {
-                                    return "circle-m4";
-                                }
-                                else if (d.name.indexOf("M5") > -1) {
-                                    return "circle-m5";
-                                }
-                                else return "circle-m5";
-                            })
-                            .attr("r", function (d) {
-                                if (d.name.indexOf("M1") > -1) {
-                                    return 25;
-                                }
-                                else if (d.name.indexOf("M2") > -1) {
-                                    return 20;
-                                }
-                                else if (d.name.indexOf("M3") > -1) {
-                                    return 15;
-                                }
-                                else if (d.name.indexOf("M4") > -1) {
-                                    return 12;
-                                }
-                                else if (d.name.indexOf("M5") > -1) {
-                                    return 8;
-                                }
-                                else return 15;
-                            })
-                            .attr("y", function (d) {
-                                var newY;
-                                if (d.name.indexOf("M1") > -1) {
-                                    newY = m1fociY;
-                                }
-                                else if (d.name.indexOf("M2") > -1) {
-                                    newY = m2fociY;
-                                }
-                                else if (d.name.indexOf("M3") > -1) {
-                                    newY = m3fociY;
-                                }
-                                else if (d.name.indexOf("M4") > -1) {
-                                    newY = m4fociY;
-                                }
-                                else if (d.name.indexOf("M5") > -1) {
-                                    newY = m5fociY;
-                                }
-                                else {
-                                    newY = m5fociY;
-                                }
-                                return newY;
-                            })
-                            .style("fill",
-                                function (d) {
-                                    return color(d.name);
-                                }
-                            );
-                        // add the text
-                        node.append("text")
-                            .attr("class", function (d) {
-                                if (d.name.indexOf("M1") > -1) {
-                                    return "m1-text-title";
-                                }
-                                else if (d.name.indexOf("M2") > -1) {
-                                    return "m2-text-title";
-                                }
-                                else if (d.name.indexOf("M3") > -1) {
-                                    return "m3-text-title";
-                                }
-                                else if (d.name.indexOf("M4") > -1) {
-                                    return "m4-text-title";
-                                }
-                                else if (d.name.indexOf("M5") > -1) {
-                                    return "m5-text-title";
-                                }
-                                else {
-                                    return "m3-text-title";
-                                }
-                            })
-                            .attr("x", function (d) {
-                                if (d.name.indexOf("M1") > -1) {
-                                    return 40;
-                                }
-                                else if (d.name.indexOf("M2") > -1) {
-                                    return 35;
-                                }
-                                else if (d.name.indexOf("M3") > -1) {
-                                    return 25;
-                                }
-                                else if (d.name.indexOf("M4") > -1) {
-                                    return 20;
-                                }
-                                else if (d.name.indexOf("M5") > -1) {
-                                    return 15;
-                                }
-                                else return 15;
-                            })
-                            .attr("dy", function (d) {
-                                if (d.name.indexOf("M1") > -1) {
-                                    return "1.0em";
-                                }
-                                else if (d.name.indexOf("M2") > -1) {
-                                    return ".85em";
-                                }
-                                else if (d.name.indexOf("M3") > -1) {
-                                    return ".75em";
-                                }
-                                else if (d.name.indexOf("M4") > -1) {
-                                    return ".70em";
-                                }
-                                else if (d.name.indexOf("M5") > -1) {
-                                    return ".65em";
-                                }
-                                else return ".65em";
-                            })
-                            .text(function (d) { return d.name })
-            
-            //
-            
-            
+            textg.selectAll("text").call(wrap, 145);
 
-            console.log('link.Source',link.Source);
+        force.on("tick", () => {
 
+
+
+            node
+                .attr("cx", d => d.x) //d.x
+                .attr("cy", d => d.y) //d.y
+                /*.attr("fy",function(d){
+                    if (d.name.indexOf("M2") > -1) {
+                    //if (1 == 0) {
+                     //   console.log('value', d3.select(this).attr("cy"), 'name', d.name);
+                        return 100;
+                        // return Number(d3.select(this).attr("cy")) - 200;
+                    }
+                    else {
+                        return null;//(d3.select(this).attr("cy"));
+                    }
+                })*/
+
+              /*  //Position of Circles according with levels M1 at the top
+                .attr("cy", function (d) {
+                    if (d.name.indexOf("M1") > -1) {
+                    //if (1 == 0) {
+                     //   console.log('value', d3.select(this).attr("cy"), 'name', d.name);
+                        return 200;
+                        // return Number(d3.select(this).attr("cy")) - 200;
+                    }
+                    if (d.name.indexOf("M2") > -1) {
+                        return 300;
+                    }
+                    if (d.name.indexOf("M3") > -1) {
+                        return 400;
+                    }
+                    if (d.name.indexOf("M4") > -1) {
+                        return 500;
+                    }
+                    if (d.name.indexOf("M5") > -1) {
+                        return 600;
+                    }
+                    else {
+                        
+                        return d.y;//(d3.select(this).attr("cy"));
+                    }
+
+                })*/
+
+                .attr("class", function (d) {
+                    if (d.name.indexOf("M1") > -1) {
+                        //console.log('test nodes M1');
+                        return "circle-m1";
+                    }
+                    else if (d.name.indexOf("M2") > -1) {
+                        return "circle-m2";
+                    }
+                    else if (d.name.indexOf("M3") > -1) {
+                        return "circle-m3";
+                    }
+                    else if (d.name.indexOf("M4") > -1) {
+                        return "circle-m4";
+                    }
+                    else if (d.name.indexOf("M5") > -1) {
+                        return "circle-m5";
+                    }
+                    else return "circle-m5";
+
+                });
+            link
+                .attr("x1", function (d) { if (d.source['x']) return d.source['x']; })
+                //.attr("y1", d => d.source['y'])
+                .attr("x2", d => d.target['x'])
+                //.attr("y2", d => d.target['y'])
+
+                .attr("y1", function (d) {
+                   /* if (d.source["name"].indexOf("M2") > -1) {
+                        return d.source['y'] - 200;
+                    }
+                    else {
+                        return d.source['y'];
+                    }*/
+                  //  if (d.source["name"].indexOf("M1") > -1) {
+                   //         return 200;
+                   //     }
+                      /*  if (d.source["name"].indexOf("M2") > -1) {
+                            return 300;
+                        }
+                        if (d.source["name"].indexOf("M3") > -1) {
+                            return 400;
+                        }
+                        if (d.source["name"].indexOf("M4") > -1) {
+                            return 500;
+                        }
+                        if (d.source["name"].indexOf("M5") > -1) {
+                            return 600;
+                        }
+                        else {
+                            */
+                            return d.source['y'];//(d3.select(this).attr("cy"));
+                        //}
+
+                })
+
+                .attr("y2", function (d) {
+                   /* if (d.target["name"].indexOf("M2") > -1) {
+                        return d.target['y'] - 200;
+                    }
+                    else {
+                        return d.target['y'];
+                    }*/
+                   // if (d.target["name"].indexOf("M1") > -1) {
+                  //      return 200;
+                  //  }
+                   /* if (d.target["name"].indexOf("M2") > -1) {
+                        return 300;
+                    }
+                    if (d.target["name"].indexOf("M3") > -1) {
+                        return 400;
+                    }
+                    if (d.target["name"].indexOf("M4") > -1) {
+                        return 500;
+                    }
+                    if (d.target["name"].indexOf("M5") > -1) {
+                        return 600;
+                    }
+                    else {
+                        */
+                        return d.target['y'];//(d3.select(this).attr("cy"));
+                   // }
+
+                    
+                });
+
+            text
+                .attr("transform", transform) //This is to add the labels in the circles
+                //.call(wrap, 85);
+
+               
 
         });
-*/
+
+        function wrap(text, width) {
+            text.each(function() {
+                console.log('selector', d3.select(this));
+              console.log('raw text', d3.select(this).text());
+              console.log(d3.select(this).text().split(/\s+/));
+              var text = d3.select(this),
+                  words = text.text().split(/\s+/).reverse(),
+                  word,
+                  line = [],
+                  lineNumber = 0,
+                  lineHeight = .45, // ems
+                  y = text.attr("y"),
+                  dy = parseFloat(text.attr("dy")), //; //,
+                  tspan = text.text(null).append("tspan").attr("x", 0).attr("y", y).attr("dy", dy + "em");
+                  console.log('word list', words);
+                  
+              while (word = words.pop()) {
+                  console.log(word);
+                line.push(word);
+                tspan.text(line.join(" "));
+                console.log('computed length', tspan.node().getComputedTextLength());
+                if (tspan.node().getComputedTextLength() > width) {
+                  line.pop();
+                  tspan.text(line.join(" "));
+                  line = [word];
+                  console.log('new dy', ++lineNumber * lineHeight + dy);
+                  tspan = text.append("tspan").attr("x", 0).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
+                  console.log(word);
+                }
+              }
+             
+            });
+           
+          }
+
+        function transform(d) {
+
+           /* if (d.name.indexOf("M1") > -1){
+                return  "translate(" + d.x + "," + (Number(d.y) - 200).toString() + ")";
+            }*/
+            /*
+            var y=0;
+
+           // if (d.name.indexOf("M1") > -1) {
+           //     y = 200;
+           // }
+            if (d.name.indexOf("M2") > -1) {
+                y = 300;
+            }
+            if (d.name.indexOf("M3") > -1) {
+                y = 400;
+            }
+            if (d.name.indexOf("M4") > -1) {
+                y = 500;
+            }
+            if (d.name.indexOf("M5") > -1) {
+                y = 600;
+            }*/
+            //else {
+            //    y= d.y;//(d3.select(this).attr("cy"));
+            //}
+
+           // return "translate(" + d.x + "," + y + ")";
+
+            return "translate(" + d.x + "," + d.y + ")";
+        }
 
 
-        this.g.append("text").text("static test name")
+        /* 
+             links.forEach(function (link) {
+     
+                 count = count + 20;
+         
+                 g.append("text").text(link.Source)
+                     .attr("x", 50)
+                     .attr("y", count)
+                     .attr("font-size", "24px")
+                     .attr("fill", "black");
+                 
+                 // add the links and the arrows
+                 var path = svg.append("svg:g").selectAll("path")
+                 .data(links2)
+                 .enter().append("svg:path")
+                 //.attr("class", function (d) { return "link " + d.type; })
+                 .attr("marker-end", "url(#end)");
+     
+                 // define the nodes
+                 var node = svg.selectAll(".node")
+                 .data(force.nodes())
+                 .enter().append("g")
+                 .attr("class", "node")
+                 ;
+     
+                 // add the nodes
+                 node.append("circle")
+                     .attr("r",25);
+     
+                 //node.append("text").text(function (d) { return d.source });
+     
+                
+     
+                 /*
+     
+                                 .attr("class", function (d) {
+                                     if (d.name.indexOf("M1") > -1) {
+                                         return "circle-m1";
+                                     }
+                                     else if (d.name.indexOf("M2") > -1) {
+                                         return "circle-m2";
+                                     }
+                                     else if (d.name.indexOf("M3") > -1) {
+                                         return "circle-m3";
+                                     }
+                                     else if (d.name.indexOf("M4") > -1) {
+                                         return "circle-m4";
+                                     }
+                                     else if (d.name.indexOf("M5") > -1) {
+                                         return "circle-m5";
+                                     }
+                                     else return "circle-m5";
+                                 })
+                                 .attr("r", function (d) {
+                                     if (d.name.indexOf("M1") > -1) {
+                                         return 25;
+                                     }
+                                     else if (d.name.indexOf("M2") > -1) {
+                                         return 20;
+                                     }
+                                     else if (d.name.indexOf("M3") > -1) {
+                                         return 15;
+                                     }
+                                     else if (d.name.indexOf("M4") > -1) {
+                                         return 12;
+                                     }
+                                     else if (d.name.indexOf("M5") > -1) {
+                                         return 8;
+                                     }
+                                     else return 15;
+                                 })
+                                 .attr("y", function (d) {
+                                     var newY;
+                                     if (d.name.indexOf("M1") > -1) {
+                                         newY = m1fociY;
+                                     }
+                                     else if (d.name.indexOf("M2") > -1) {
+                                         newY = m2fociY;
+                                     }
+                                     else if (d.name.indexOf("M3") > -1) {
+                                         newY = m3fociY;
+                                     }
+                                     else if (d.name.indexOf("M4") > -1) {
+                                         newY = m4fociY;
+                                     }
+                                     else if (d.name.indexOf("M5") > -1) {
+                                         newY = m5fociY;
+                                     }
+                                     else {
+                                         newY = m5fociY;
+                                     }
+                                     return newY;
+                                 })
+                                 .style("fill",
+                                     function (d) {
+                                         return color(d.name);
+                                     }
+                                 );
+                             // add the text
+                             node.append("text")
+                                 .attr("class", function (d) {
+                                     if (d.name.indexOf("M1") > -1) {
+                                         return "m1-text-title";
+                                     }
+                                     else if (d.name.indexOf("M2") > -1) {
+                                         return "m2-text-title";
+                                     }
+                                     else if (d.name.indexOf("M3") > -1) {
+                                         return "m3-text-title";
+                                     }
+                                     else if (d.name.indexOf("M4") > -1) {
+                                         return "m4-text-title";
+                                     }
+                                     else if (d.name.indexOf("M5") > -1) {
+                                         return "m5-text-title";
+                                     }
+                                     else {
+                                         return "m3-text-title";
+                                     }
+                                 })
+                                 .attr("x", function (d) {
+                                     if (d.name.indexOf("M1") > -1) {
+                                         return 40;
+                                     }
+                                     else if (d.name.indexOf("M2") > -1) {
+                                         return 35;
+                                     }
+                                     else if (d.name.indexOf("M3") > -1) {
+                                         return 25;
+                                     }
+                                     else if (d.name.indexOf("M4") > -1) {
+                                         return 20;
+                                     }
+                                     else if (d.name.indexOf("M5") > -1) {
+                                         return 15;
+                                     }
+                                     else return 15;
+                                 })
+                                 .attr("dy", function (d) {
+                                     if (d.name.indexOf("M1") > -1) {
+                                         return "1.0em";
+                                     }
+                                     else if (d.name.indexOf("M2") > -1) {
+                                         return ".85em";
+                                     }
+                                     else if (d.name.indexOf("M3") > -1) {
+                                         return ".75em";
+                                     }
+                                     else if (d.name.indexOf("M4") > -1) {
+                                         return ".70em";
+                                     }
+                                     else if (d.name.indexOf("M5") > -1) {
+                                         return ".65em";
+                                     }
+                                     else return ".65em";
+                                 })
+                                 .text(function (d) { return d.name })
+                 
+                 //
+                 
+                 
+     
+                 console.log('link.Source',link.Source);
+     
+     
+             });
+     */
+
+      /*  this.g.append("text").text("static test name")
             .attr("x", 50)
             .attr("y", 150)
             .attr("font-size", "24px")
-            .attr("fill", "black");
+            .attr("fill", "black");*/
+
+        //this.g.append("classed")
+    }
+
+    private reset(): void {
+        if (this.svg.empty()) {
+            return;
+        }
+        this.svg
+            .selectAll("*")
+            .remove();
     }
 
     private static parseSettings(dataView: DataView): VisualSettings {
@@ -454,37 +715,49 @@ export class Visual implements IVisual {
     }
 
     public static converter(options: VisualUpdateOptions): Relationship[] {
-    
-     
 
         let resultData: Relationship[] = [];
-
+console.log('converting');
+        console.log('dataviews', options.dataViews[0]);
         if (!options.dataViews[0]
             || !options.dataViews[0]
             || !options.dataViews[0].categorical
             || !options.dataViews[0].categorical.categories
             || !options.dataViews[0].categorical.categories[0].source
             || !options.dataViews[0].categorical.categories[1].source
+            || !options.dataViews[0].categorical.categories[2].source
+            || !options.dataViews[0].categorical.categories[3].source
+            || !options.dataViews[0].categorical.categories[4].source
         )
             return resultData;
 
         let rows = options.dataViews[0].categorical.categories[0].values;
         let cols = options.dataViews[0].categorical.categories[1].values;
-
-        console.log(rows);
+        let levels = options.dataViews[0].categorical.categories[2].values;
+        let tlevels = options.dataViews[0].categorical.categories[3].values;
+        let kops = options.dataViews[0].categorical.categories[4].values;
         //debugger;
         //let rows = options.dataViews[0].table.rows;
+
+        console.log('rows', rows);
+        console.log('cols', cols);
+        console.log('levels', levels);
 
         //convert from ['x', y] to [{"x":x, "y": y}]
         for (let i = 0; i < rows.length; i++) {
             let row = rows[i];
+            //console.log(cols[i].toString());
             resultData.push({
                 Source: row.toString(),
-                Target: cols[i].toString()
+                Target: String(cols[i]),
+                Level: levels[i].toString(),
+                TLevel: String(tlevels[i]),
+                Kop: String(kops[i])
             });
         }
-        return resultData;
         console.log('resultData ', resultData);
+        return resultData;
+
     }
 
 

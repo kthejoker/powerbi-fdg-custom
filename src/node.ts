@@ -11,11 +11,60 @@ export class Node implements d3.SimulationNodeDatum {
     fy?: number | null;
   
     name: string;
+    lvl: string;
     linkCount: number = 0;
+
+      constructor(name, lvl) {
+      this.name = name;
+      this.lvl = lvl;
+      var rnd = Math.random() * 60 - 30;
+      if (this.lvl == "M1") {
+        this.fy = 30;
+      }
+
+      if (this.lvl == "M2") {
+        this.fy = 150 + rnd;
+      }
+
+      if (this.lvl == "M3") {
+        this.fy = 270 + rnd;
+      }
+
+      if (this.lvl == "M4") {
+        this.fy = 390 + rnd;
+      }
+
+      if (this.lvl == "M5") {
+        this.fy = 510 + rnd;
+      }
+    }
   
+   // constructor(name, lvl) {
+     /*
     constructor(name) {
       this.name = name;
+      this.lvl = this.name.substring(0,2);
+      if (this.lvl == "M1") {
+        this.fy = 100;
+      }
+
+      if (this.lvl == "M2") {
+        this.fy = 200;
+      }
+
+      if (this.lvl == "M3") {
+        this.fy = 300;
+      }
+
+      if (this.lvl == "M4") {
+        this.fy = 400;
+      }
+
+      if (this.lvl == "M5") {
+        this.fy = 500;
+      }
     }
+    */
   
     normal = () => {
     //  return Math.sqrt(this.linkCount / APP_CONFIG.N);
